@@ -12,8 +12,10 @@ T = 60
 CAMERAS = []
 
 # this has the recording processes stored
-RECORDINGS = []
+RECORDINGS = {}
 
+
+# read from db
 def readDb(select_statement):
     conn = None
     cursor = None
@@ -35,6 +37,29 @@ def readDb(select_statement):
             conn.close()
             return records
 
+
+# save pid of job to db for later use
+# used on process startup and process end
+def insertPID(id, pid):
+    insert_statement = 'INSERT %s IN recordings WHERE id=%s'
+    conn = None
+    cursor = None
+    try:
+        conn = pg.connect(DATABASE_URL, sslmode='require')
+        cursor = conn.cursor()
+        cursor.execute(insert_statement, [pid, id])
+
+    except(Exception, pg.Error) as error:
+        print("there was an error inserting the pid", error)
+
+    finally:
+        print("end of db write")
+        if(conn):
+            cursor.close()
+            conn.close()
+            return 
+
+
 # check that only the processes that should be running are
 def checkRunning(records):
     failures = []
@@ -51,17 +76,9 @@ def checkRunning(records):
     else:
         return True, failures
 
-# start new recordings
-# def runner(requests):
-#     for r in requests:
-#         r.proc, r.pid = rtsp.record(r.topic)
 
-# kill processes that need to end
-def johnWick(requests):
-    for r in requests:
-        rtsp.stopRecord(r.proc)
-
-
+# make sure all cameras are up and running
+# good for also setting up new cameras
 def cameraProcess():
     statement = ''
     camera_jobs = readDb(statement)
@@ -72,22 +89,32 @@ def cameraProcess():
                 f.proc, f.pid = rtsp.record(f.topic)
 
 
+# start necessary jobs
+# stop certian jobs
 def recordProcess():
-    start_statement = ''
-    stop_statement = ''
+    start_statement = "SELECT * FROM recordings WHERE start_day <= CURRENT_DATE AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (week_day) AND stop_dat >= CURRENT_DATE AND start_time = to_char(LOCALTIME, 'HH:MI') ;"
+    stop_statement = "SELECT * FROM recordings WHERE start_day <= CURRENT_DATE AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (week_day) AND stop_dat >= CURRENT_DATE AND duration = to_char((LOCALTIMESTAMP - last_started), 'HH:MI') ;"
+    # get jobs that need to be started
     start_jobs = readDb(start_statement)
+    # get jobs that need to be stopped
     stop_jobs = readDb(stop_statement)
-    start_stat, start_fails = checkRunning(start_jobs)
-    stop_stat, stop_fails = checkRunning(stop_jobs)
-    if not start_stat:
-        for f in start_fails:
-            if f.pid == -1:
-                f.proc, f.pid = rtsp.record(f.topic)
-    if not stop_stat:
-        for f in stop_fails:
-            if f.pid == -1:
-                f.proc, f.pid = rtsp.record(f.topic)
+    # start jobs that need to start
+    for sj in start_jobs:
+        proc, pid = rtsp.record(sj.topic)
+        RECORDINGS[pid] = {'id': sj[0],
+                           'pid': pid,
+                           'proc': proc,
+                           'start_time': sj[7],
+                           'stop_time': sj[7] + 
+                           'topics': sj[9]}
+        insertPID(sj[0], pid)
+    # stop jobs that need to stop
+    for stop in stop_jobs:
+        rtsp.stopRecord(job_stop.proc)
+        insertPID(sj[0], -1)
 
+
+# keep everything running
 def main():
     while True:
         time.sleep(T)
