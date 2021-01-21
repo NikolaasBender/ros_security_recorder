@@ -1,0 +1,1 @@
+INSERT INTO cameras (topic_name, hostname)

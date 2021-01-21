@@ -92,8 +92,8 @@ def cameraProcess():
 # start necessary jobs
 # stop certian jobs
 def recordProcess():
-    start_statement = "SELECT * FROM recordings WHERE start_day <= CURRENT_DATE AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (week_day) AND stop_dat >= CURRENT_DATE AND start_time = to_char(LOCALTIME, 'HH:MI') ;"
-    stop_statement = "SELECT * FROM recordings WHERE start_day <= CURRENT_DATE AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (week_day) AND stop_dat >= CURRENT_DATE AND duration = to_char((LOCALTIMESTAMP - last_started), 'HH:MI') ;"
+    start_statement = rtsp.startSelectStatement()
+    stop_statement = rtsp.stopSelectStatement()
     # get jobs that need to be started
     start_jobs = readDb(start_statement)
     # get jobs that need to be stopped

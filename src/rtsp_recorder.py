@@ -34,21 +34,26 @@ def addCamera(cam_data):
     return proc, proc.pid
 
 
-def createStartSelect(repeat):
-    moment = dt.now()
-    year = moment.year
-    month = moment.month
-    day = moment.day
-    hour = moment.hour
-    minute = moment.minute
-    # One important thing to note is that in JavaScript 0 = Sunday, Python starts with 0 = Monday. Something that I ran into, front-end vs back-end -- stack overflow
-    wd = moment.weekday
+# def createStartSelect(repeat):
+#     moment = dt.now()
+#     year = moment.year
+#     month = moment.month
+#     day = moment.day
+#     hour = moment.hour
+#     minute = moment.minute
+#     # One important thing to note is that in JavaScript 0 = Sunday, Python starts with 0 = Monday. Something that I ran into, front-end vs back-end -- stack overflow
+#     wd = moment.weekday
 
-    start_date = str(year) + '-' + str(month) + '-' + str(day)
-    start_time = str(hour) + ':' + str(minute)
+#     start_date = str(year) + '-' + str(month) + '-' + str(day)
+#     start_time = str(hour) + ':' + str(minute)
     
-    if repeat:
-        return 'SELECT * FROM recording_requests WHERE repeat=1, start_time={}, start_date<={}, weekday={}'.format(start_time, start_date, wd)
-    else:
-        return 'SELECT * FROM recording_requests WHERE repeat=0, start_time={}, start_date={}'.format(start_date, start_date)
+#     if repeat:
+#         return 'SELECT * FROM recording_requests WHERE repeat=1, start_time={}, start_date<={}, weekday={}'.format(start_time, start_date, wd)
+#     else:
+#         return 'SELECT * FROM recording_requests WHERE repeat=0, start_time={}, start_date={}'.format(start_date, start_date)
     
+def startSelectStatement():
+    return "SELECT * FROM recordings WHERE start_day <= CURRENT_DATE AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (week_day) AND stop_dat >= CURRENT_DATE AND start_time = to_char(LOCALTIME, 'HH:MI'); "
+
+def stopSelectStatement():
+    return "SELECT * FROM recordings WHERE start_day <= CURRENT_DATE AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (week_day) AND stop_dat >= CURRENT_DATE AND duration = to_char((LOCALTIMESTAMP - last_started), 'HH:MI') ;"
