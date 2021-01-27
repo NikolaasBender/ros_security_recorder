@@ -1,9 +1,17 @@
+#!/usr/bin/env python3
+
 import psycopg2 as pg
 import time
 import os
 import rtsp_recorder as rtsp
+import rospy
+import sys
 
-DATABASE_URL =
+# DATABASE_INFO = 
+#     "localhost",
+#     "smartbaseweb",
+#     "postgres",
+#     "smartbases")
 
 # sleep time in sec
 T = 60
@@ -17,11 +25,15 @@ RECORDINGS = {}
 
 # read from db
 def readDb(select_statement):
+    print('reading from database')
     conn = None
     cursor = None
     records = None
     try:
-        conn = pg.connect(DATABASE_URL, sslmode='require')
+        conn = pg.connect(host="localhost",
+                          database="smartbasesweb",
+                          user="postgres",
+                          password="smartbases")
         cursor = conn.cursor()
         selector = select_statement
         cursor.execute(selector)
@@ -40,12 +52,16 @@ def readDb(select_statement):
 
 # save pid of job to db for later use
 # used on process startup and process end
-def insertPID(id, pid):
-    insert_statement = 'INSERT %s IN recordings WHERE id=%s'
+def insertPID(id, pid, table):
+    print('inserting a pid')
+    insert_statement = 'UPDATE recordings SET pid=%s, last_started=LOCALTIMESTAMP WHERE id=%s'
     conn = None
     cursor = None
     try:
-        conn = pg.connect(DATABASE_URL, sslmode='require')
+        conn = pg.connect(host="localhost",
+                          database="smartbasesweb",
+                          user="postgres",
+                          password="smartbases")
         cursor = conn.cursor()
         cursor.execute(insert_statement, [pid, id])
 
@@ -62,6 +78,7 @@ def insertPID(id, pid):
 
 # check that only the processes that should be running are
 def checkRunning(records):
+    print('checking things are running')
     failures = []
     for r in records:
         # Sending signal 0 to a pid will raise an OSError exception if the pid is not running, and do nothing otherwise.
@@ -92,22 +109,27 @@ def cameraProcess():
 # start necessary jobs
 # stop certian jobs
 def recordProcess():
+    print('running the record process')
     start_statement = rtsp.startSelectStatement()
     stop_statement = rtsp.stopSelectStatement()
     # get jobs that need to be started
     start_jobs = readDb(start_statement)
+    print(start_jobs)
     # get jobs that need to be stopped
     stop_jobs = readDb(stop_statement)
+    print(stop_jobs)
     # start jobs that need to start
-    for sj in start_jobs:
-        proc, pid = rtsp.record(sj.topic)
-        RECORDINGS[pid] = {'id': sj[0],
-                           'pid': pid,
-                           'proc': proc,
-                           'start_time': sj[7],
-                           'stop_time': sj[7] + 
-                           'topics': sj[9]}
-        insertPID(sj[0], pid)
+    if type(start_jobs) != type(None):
+        for sj in start_jobs:
+            proc, pid = rtsp.record(sj[9])
+            print('started a job', pid)
+            RECORDINGS[pid] = {'id': sj[0],
+                            'pid': pid,
+                            'proc': proc,
+                            'start_time': sj[7],
+                            'stop_time': sj[7],
+                            'topics': sj[9]}
+            insertPID(sj[0], pid, 'recordings')
     # stop jobs that need to stop
     for stop in stop_jobs:
         rtsp.stopRecord(job_stop.proc)
@@ -116,9 +138,11 @@ def recordProcess():
 
 # keep everything running
 def main():
+    rtsp.check()
+    print('in main')
     while True:
         time.sleep(T)
-        cameraProcess()
+        # cameraProcess()
         recordProcess()
 
 # do the main loop

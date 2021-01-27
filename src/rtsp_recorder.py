@@ -5,8 +5,8 @@ import time
 import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, CameraInfo
-from camera_info_manager import *
-from threading import Thread
+# from camera_info_manager import *
+# from threading import Thread
 from time import sleep
 import subprocess
 from datetime import datetime as dt
@@ -15,7 +15,7 @@ SAVE_LOCATION = ''
 
 def record(topics):
     # os.system('rosbag record camera_')
-    proc = subprocess.Popen(['rosbag', 'redord', topics], shell=False)
+    proc = subprocess.Popen(['rosbag', 'record', ' '.join(map(str, topics))], shell=False)
     return proc, proc.pid
 
 
@@ -53,7 +53,30 @@ def addCamera(cam_data):
 #         return 'SELECT * FROM recording_requests WHERE repeat=0, start_time={}, start_date={}'.format(start_date, start_date)
     
 def startSelectStatement():
-    return "SELECT * FROM recordings WHERE start_day <= CURRENT_DATE AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (week_day) AND stop_dat >= CURRENT_DATE AND start_time = to_char(LOCALTIME, 'HH:MI'); "
+    return '''SELECT * 
+                FROM recordings 
+                WHERE recordings.repeat = TRUE
+                AND recordings.start_date <= CURRENT_DATE
+                AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day)
+                AND recordings.pid = -1
+                AND recordings.start_time = LOCALTIME(0)
+                ; '''
+
+# WHERE recordings.repeat = TRUE
+#                     AND recordings.start_date <= CURRENT_DATE 
+#                     AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day) 
+#                     AND recordings.stop_date >= CURRENT_DATE 
+#                    AND recordings.start_time = LOCALTIME(0)
+                # AND recordings.pid = -1
 
 def stopSelectStatement():
-    return "SELECT * FROM recordings WHERE start_day <= CURRENT_DATE AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (week_day) AND stop_dat >= CURRENT_DATE AND duration = to_char((LOCALTIMESTAMP - last_started), 'HH:MI') ;"
+    return '''SELECT * 
+                FROM recordings 
+                WHERE recordings.start_date <= CURRENT_DATE 
+                    AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day) 
+                    AND recordings.stop_date >= CURRENT_DATE 
+                    AND recordings.duration = (LOCALTIMESTAMP - recordings.last_started)
+                ;'''
+
+def check():
+    print('check check. if you can see this, that is a good sign')

@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>rtsp_recorder</name>
+  <name>ros_security_recorder</name>
   <version>0.0.0</version>
   <description>The rtsp_recorder package</description>
 

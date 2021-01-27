@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(rtsp_recorder)
+project(ros_security_recorder)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -204,3 +204,7 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+catkin_install_python(PROGRAMS src/rtsp_recorder.py src/rtsp_manager.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
