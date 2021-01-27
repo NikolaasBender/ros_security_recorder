@@ -15,7 +15,9 @@ SAVE_LOCATION = ''
 
 def record(topics):
     # os.system('rosbag record camera_')
-    proc = subprocess.Popen(['rosbag', 'record', ' '.join(map(str, topics))], shell=False)
+    topic_str = ' '.join(map(str, topics))
+    print(topic_str)
+    proc = subprocess.Popen(['rosbag', 'record', topic_str], shell=False)
     return proc, proc.pid
 
 
@@ -59,7 +61,7 @@ def startSelectStatement():
                 AND recordings.start_date <= CURRENT_DATE
                 AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day)
                 AND recordings.pid = -1
-                AND recordings.start_time = LOCALTIME(0)
+                AND recordings.start_time = date_trunc('minute', LOCALTIME(0))::time
                 ; '''
 
 # WHERE recordings.repeat = TRUE

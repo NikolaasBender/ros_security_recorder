@@ -141,9 +141,9 @@ def main():
     rtsp.check()
     print('in main')
     while True:
-        time.sleep(T)
         # cameraProcess()
         recordProcess()
+        time.sleep(T)
 
 # do the main loop
 main()
