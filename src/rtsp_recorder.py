@@ -55,21 +55,18 @@ def addCamera(cam_data):
 #         return 'SELECT * FROM recording_requests WHERE repeat=0, start_time={}, start_date={}'.format(start_date, start_date)
     
 def startSelectStatement():
-    return '''SELECT * 
+    return '''SELECT *
                 FROM recordings 
-                WHERE recordings.repeat = TRUE
-                AND recordings.start_date <= CURRENT_DATE
-                AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day)
-                AND recordings.pid = -1
-                AND recordings.start_time = date_trunc('minute', LOCALTIME(0))::time
+                WHERE (recordings.repeat = TRUE
+                        AND recordings.start_date <= CURRENT_DATE
+                        AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day)) 
+                        OR (recordings.repeat = FALSE
+                        AND recordings.start_date = CURRENT_DATE)
+                    AND recordings.pid = -1
+                    AND recordings.start_time = date_trunc('minute', LOCALTIME(0))::time
+                    
                 ; '''
 
-# WHERE recordings.repeat = TRUE
-#                     AND recordings.start_date <= CURRENT_DATE 
-#                     AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day) 
-#                     AND recordings.stop_date >= CURRENT_DATE 
-#                    AND recordings.start_time = LOCALTIME(0)
-                # AND recordings.pid = -1
 
 def stopSelectStatement():
     return '''SELECT * 
