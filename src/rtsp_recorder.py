@@ -15,9 +15,8 @@ SAVE_LOCATION = ''
 
 def record(topics):
     # os.system('rosbag record camera_')
-    topic_str = ' '.join(map(str, topics))
-    print(topic_str)
-    proc = subprocess.Popen(['rosbag', 'record', topic_str], shell=False)
+    print('topic string', topics)
+    proc = subprocess.Popen(['rosbag', 'record', '-o', '~/'  *topics], shell=False)
     return proc, proc.pid
 
 
@@ -32,7 +31,8 @@ def addCamera(cam_data):
     # <arg name="password" default='smartbases' doc="password for the rtsp camera" />
     # <arg name="port" default="554" doc="port of the rtsp camera" />
     # <arg name="stream" default="defaultPrimary?mtu=1440&amp;streamType=m" doc="name of the video stream published by the rtsp camera" />
-    proc = subprocess.Popen(['roslaunch', 'rtsp_camera rtsp_camera.launch', cam_data], shell=False)
+    # cli arg like this hoge:=my_value
+    proc = subprocess.Popen(['roslaunch', 'rtsp_camera rtsp_camera.launch', *cam_data], shell=False)
     return proc, proc.pid
 
 
@@ -59,13 +59,14 @@ def startSelectStatement():
                 FROM recordings 
                 WHERE (recordings.repeat = TRUE
                         AND recordings.start_date <= CURRENT_DATE
-                        AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day)) 
+                        AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day)
+                        AND recordings.pid = -1
+                        AND recordings.start_time = date_trunc('minute', LOCALTIME(0))::time) 
                         OR (recordings.repeat = FALSE
-                        AND recordings.start_date = CURRENT_DATE)
-                    AND recordings.pid = -1
-                    AND recordings.start_time = date_trunc('minute', LOCALTIME(0))::time
-                    
-                ; '''
+                        AND recordings.start_date = CURRENT_DATE
+                        AND recordings.pid = -1
+                        AND recordings.start_time = date_trunc('minute', LOCALTIME(0))::time)
+                     ; '''
 
 
 def stopSelectStatement():
@@ -74,7 +75,13 @@ def stopSelectStatement():
                 WHERE recordings.start_date <= CURRENT_DATE 
                     AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day) 
                     AND recordings.stop_date >= CURRENT_DATE 
-                    AND recordings.duration = (LOCALTIMESTAMP - recordings.last_started)
+                    AND recordings.pid != -1
+                    AND recordings.duration = date_trunc('minute', (LOCALTIMESTAMP - recordings.last_started))
+                ;'''
+
+def cameraCheck():
+    return '''SELECT * 
+                FROM cameras
                 ;'''
 
 def check():
