@@ -12,3 +12,10 @@ sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu `lsb_release -sc` main"
 wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
 sudo apt update
 sudo apt install python3-catkin-tools
+
+for uploading to azure, you need this installed
+https://docs.microsoft.com/en-us/azure/storage/blobs/storage-quickstart-blobs-python
+pip3 install azure-storage-blob
+then set this so that the python can connect to the storage
+export AZURE_STORAGE_CONNECTION_STRING="<yourconnectionstring>"
+

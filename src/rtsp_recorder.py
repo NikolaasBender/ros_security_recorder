@@ -16,11 +16,12 @@ SAVE_LOCATION = ''
 def record(topics):
     # os.system('rosbag record camera_')
     print('topic string', topics)
-    proc = subprocess.Popen(['rosbag', 'record', '-o', '~/'  *topics], shell=False)
-    return proc, proc.pid
+    bag_name = 'please_change_me.bag'
+    proc = subprocess.Popen(['rosbag', 'record', '-O', bag_name, *topics], shell=False)
+    return proc, proc.pid, bag_name
 
 
-def stopRecord(proc):
+def stopRecord(proc, file_name):
    proc.terminate()
 
 

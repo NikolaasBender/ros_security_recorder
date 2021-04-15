@@ -127,18 +127,19 @@ def recordProcess(sleep_time):
         # start jobs that need to start
         if type(start_jobs) != type(None):
             for sj in start_jobs:
-                proc, pid = rtsp.record(sj['topics'])
+                proc, pid, file_name = rtsp.record(sj['topics'])
                 print('started a job', pid)
                 RECORDINGS[pid] = {'id': sj['id'],
                                 'pid': pid,
                                 'proc': proc,
                                 'start_time': sj['start_time'],
                                 'stop_time': sj['stop_time'],
-                                'topics': sj['topics']}
+                                'topics': sj['topics'],
+                                'file_name': file_name}
                 insertPID(sj['id'], pid, 'recordings')
         # stop jobs that need to stop
         for stop in stop_jobs:
-            rtsp.stopRecord(job_stop.proc)
+            rtsp.stopRecord(stop.proc, RECORDINGS[stop.pid]['file_name'])
             insertPID(sj['id'], -1)
         time.sleep(sleep_time)
 
