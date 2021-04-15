@@ -10,18 +10,20 @@ from sensor_msgs.msg import Image, CameraInfo
 from time import sleep
 import subprocess
 from datetime import datetime as dt
+import re
 
 SAVE_LOCATION = ''
 
 def record(topics):
     # os.system('rosbag record camera_')
     print('topic string', topics)
-    proc = subprocess.Popen(['rosbag', 'record', '-o', '~/'  *topics], shell=False)
+    proc = subprocess.Popen(['rosbag', 'record', *topics], shell=False)
     return proc, proc.pid
 
 
 def stopRecord(proc):
-   proc.terminate()
+    print('stopping a recording')
+    proc.terminate()
 
 
 def addCamera(cam_data):
@@ -32,28 +34,13 @@ def addCamera(cam_data):
     # <arg name="port" default="554" doc="port of the rtsp camera" />
     # <arg name="stream" default="defaultPrimary?mtu=1440&amp;streamType=m" doc="name of the video stream published by the rtsp camera" />
     # cli arg like this hoge:=my_value
-    proc = subprocess.Popen(['roslaunch', 'rtsp_camera rtsp_camera.launch', *cam_data], shell=False)
+    print(cam_data['hostname'])
+    hostname = cam_data['hostname'][1: len(cam_data['hostname'])-1]
+    print(hostname)
+    proc = subprocess.Popen(['roslaunch', 'rtsp_ros_driver', 'rtsp_camera.launch', 'hostname:='+hostname, 'username:='+cam_data['username'], 'password:='+cam_data['password'] ], shell=False)
     return proc, proc.pid
 
 
-# def createStartSelect(repeat):
-#     moment = dt.now()
-#     year = moment.year
-#     month = moment.month
-#     day = moment.day
-#     hour = moment.hour
-#     minute = moment.minute
-#     # One important thing to note is that in JavaScript 0 = Sunday, Python starts with 0 = Monday. Something that I ran into, front-end vs back-end -- stack overflow
-#     wd = moment.weekday
-
-#     start_date = str(year) + '-' + str(month) + '-' + str(day)
-#     start_time = str(hour) + ':' + str(minute)
-    
-#     if repeat:
-#         return 'SELECT * FROM recording_requests WHERE repeat=1, start_time={}, start_date<={}, weekday={}'.format(start_time, start_date, wd)
-#     else:
-#         return 'SELECT * FROM recording_requests WHERE repeat=0, start_time={}, start_date={}'.format(start_date, start_date)
-    
 def startSelectStatement():
     return '''SELECT *
                 FROM recordings 
@@ -73,8 +60,6 @@ def stopSelectStatement():
     return '''SELECT * 
                 FROM recordings 
                 WHERE recordings.start_date <= CURRENT_DATE 
-                    AND EXTRACT(DOW FROM CURRENT_DATE) = ANY (recordings.week_day) 
-                    AND recordings.stop_date >= CURRENT_DATE 
                     AND recordings.pid != -1
                     AND recordings.duration = date_trunc('minute', (LOCALTIMESTAMP - recordings.last_started))
                 ;'''
