@@ -7,6 +7,7 @@ import rospy
 import sys
 from multiprocessing import Process
 import db_interface as db
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 
 # sleep time in sec
 T = 60
@@ -16,6 +17,11 @@ CAMERAS = {}
 
 # this has the recording processes stored
 RECORDINGS = {}
+
+# connection string for our azure blob storage
+az_connect = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+blob_service_client = BlobServiceClient.from_connection_string(connect_str)
+container_name = ''
 
 # make sure all cameras are up and running
 # good for also setting up new cameras
@@ -77,7 +83,29 @@ def recordProcess(sleep_time):
                     stop['pid'] = -1               
                 db.insertPID(stop['id'], -1, 'recordings')
                 # assert (len(RECORDINGS) < before), 'A recording was not deleted from the dict RECORDINGS.'
+        # Find all non active bags and push to blob
+        blobLoader()
+
         time.sleep(sleep_time)
+
+
+def blobLoader():
+    global_file_path = '~/catkin_ws/src/ros_security_recorder/src/'
+    # double check this is correct for where the bags go
+    bags = os.listdir(global_file_path)
+    bags = [b for b in bags if '.bag.active' not in b and '.bag' in b]
+
+    for b in bags:
+        # Create a blob client using the local file name as the name for the blob
+        blob_client = blob_service_client.get_blob_client(container=container_name, blob=b)
+
+        print("\nUploading to Azure Storage as blob:\n\t" + b)
+
+        upload_file_path = os.path.join(global_file_path, b)
+
+        # Upload the created file
+        with open(upload_file_path, "rb") as data:
+            blob_client.upload_blob(data)
 
 
 # keep everything running
