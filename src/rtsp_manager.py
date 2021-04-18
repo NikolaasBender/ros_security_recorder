@@ -7,7 +7,7 @@ import rospy
 import sys
 from multiprocessing import Process
 import db_interface as db
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient, BlobSasPermissions
 
 # sleep time in sec
 T = 60
@@ -19,9 +19,15 @@ CAMERAS = {}
 RECORDINGS = {}
 
 # connection string for our azure blob storage
-az_connect = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
-blob_service_client = BlobServiceClient.from_connection_string(connect_str)
-container_name = ''
+# ENV didn't work
+# az_connect = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+
+f = open('connect.ourkey', 'r')
+sas_url = f.read()
+blob_service_client = ContainerClient.from_container_url(sas_url)
+
+#blob_service_client = BlobServiceClient.from_connection_string("key")
+container_name = 'smartbases'
 
 # make sure all cameras are up and running
 # good for also setting up new cameras
@@ -90,15 +96,18 @@ def recordProcess(sleep_time):
 
 
 def blobLoader():
-    global_file_path = '~/catkin_ws/src/ros_security_recorder/src/'
+    print('blob loader active')
+    # global_file_path = '~/catkin_ws/src/ros_security_recorder/src/'
+    global_file_path = os.curdir
     # double check this is correct for where the bags go
-    bags = os.listdir(global_file_path)
+    # bags = os.listdir(global_file_path)
+    bags = os.listdir()
     bags = [b for b in bags if '.bag.active' not in b and '.bag' in b]
 
     for b in bags:
         # Create a blob client using the local file name as the name for the blob
-        blob_client = blob_service_client.get_blob_client(container=container_name, blob=b)
-
+        # blob_client = blob_service_client.get_blob_client(container=container_name, blob=b)
+        blob_client = blob_service_client.get_blob_client(blob=b)
         print("\nUploading to Azure Storage as blob:\n\t" + b)
 
         upload_file_path = os.path.join(global_file_path, b)
@@ -106,6 +115,11 @@ def blobLoader():
         # Upload the created file
         with open(upload_file_path, "rb") as data:
             blob_client.upload_blob(data)
+
+        if os.path.exists(upload_file_path):
+            os.remove(upload_file_path)
+        else:
+            print("The file does not exist")
 
 
 # keep everything running
