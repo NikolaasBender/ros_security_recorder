@@ -6,10 +6,11 @@ import rospy
 import sys
 from multiprocessing import Process
 import psycopg2.extras
+import errlog
 
 # read from db
 def readDb(select_statement):
-    print('reading from database')
+    errlog.progLog('reading from database')
     conn = None
     cursor = None
     records = None
@@ -24,10 +25,10 @@ def readDb(select_statement):
         records = cursor.fetchall()
 
     except(Exception, pg.Error) as error:
-        print("there was an error getting your things", error)
+        errlog.progLog(f"{rtsp.bcolors.FAIL}there was an error getting your things {error}{rtsp.bcolors.ENDC}")
 
     finally:
-        print("end of db read")
+        errlog.progLog("end of db read")
         if(conn):
             conn.commit()
             # cursor.close()
@@ -38,7 +39,7 @@ def readDb(select_statement):
 # save pid of job to db for later use
 # used on process startup and process end
 def insertPID(id, pid, table):
-    print('inserting a pid for id', id, pid)
+    errlog.progLog('inserting a pid for id', id, pid, level=0)
     insert_statement = 'UPDATE {} SET pid=%s'.format(table)
     if table == 'recordings':
         insert_statement += ', last_started=LOCALTIMESTAMP' 
@@ -52,14 +53,14 @@ def insertPID(id, pid, table):
                           password="smartbases")
         cursor = conn.cursor()
         cursor.execute(insert_statement, (pid, id,))
-        print('updated', cursor.rowcount)
+        errlog.progLog('updated', cursor.rowcount, level=0)
         conn.commit()
 
     except(Exception, pg.Error) as error:
-        print("there was an error inserting the pid", error)
+        errlog.progLog(f"{rtsp.bcolors.FAIL}there was an error inserting the pids{error}{rtsp.bcolors.ENDC}", level=2)
 
     finally:
-        print("end of db write")
+        errlog.progLog("end of db write", level=0)
         if(conn):
             cursor.close()
             conn.close()
@@ -68,7 +69,7 @@ def insertPID(id, pid, table):
 
 # check that only the processes that should be running are
 def checkRunning(records):
-    print('checking things are running')
+    errlog.progLog('checking things are running', level=0)
     failures = []
     for r in records:
         if r['pid'] == -1:
@@ -84,3 +85,27 @@ def checkRunning(records):
         return False, failures
     else:
         return True, failures
+
+def resetCameraPids():
+    insert_statement = rtsp.camFirstRun()
+    conn = None
+    cursor = None
+    try:
+        conn = pg.connect(host="localhost",
+                          database="smartbasesweb",
+                          user="postgres",
+                          password="smartbases")
+        cursor = conn.cursor()
+        cursor.execute(insert_statement,)
+        errlog.progLog('updated', cursor.rowcount, level=0)
+        conn.commit()
+
+    except(Exception, pg.Error) as error:
+        errlog.progLog(f"{rtsp.bcolors.FAIL}there was an error resetting the camera pids{error}{rtsp.bcolors.ENDC}", level=2)
+
+    finally:
+        errlog.progLog("end of db write", level=0)
+        if(conn):
+            cursor.close()
+            conn.close()
+            return 

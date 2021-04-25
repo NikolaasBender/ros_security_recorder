@@ -11,18 +11,32 @@ from time import sleep
 import subprocess
 from datetime import datetime as dt
 import re
+import errlog
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 SAVE_LOCATION = ''
 
 def record(topics):
     # os.system('rosbag record camera_')
-    print('topic string', topics)
-    bag_name = 'please_change_me.bag'
-    proc = subprocess.Popen(['rosbag', 'record', '-O', bag_name, *topics], shell=False)
-    return proc, proc.pid, bag_name
+    topics = [t+'/image_raw' for t in topics]
+    errlog.progLog('topic string', topics, level=0)
+    # bag_name = 'please_change_me.bag'
+    # proc = subprocess.Popen(['rosbag', 'record', '-O', bag_name, *topics], shell=False)
+    proc = subprocess.Popen(['rosbag', 'record', *topics], shell=False)
+    return proc, proc.pid
 
 
-def stopRecord(proc, file_name):
+def stopRecord(proc):
    proc.terminate()
 
 
@@ -34,10 +48,10 @@ def addCamera(cam_data):
     # <arg name="port" default="554" doc="port of the rtsp camera" />
     # <arg name="stream" default="defaultPrimary?mtu=1440&amp;streamType=m" doc="name of the video stream published by the rtsp camera" />
     # cli arg like this hoge:=my_value
-    print(cam_data['hostname'])
-    hostname = cam_data['hostname'][1: len(cam_data['hostname'])-1]
-    print(hostname)
-    proc = subprocess.Popen(['roslaunch', 'rtsp_ros_driver', 'rtsp_camera.launch', 'hostname:='+hostname, 'username:='+cam_data['username'], 'password:='+cam_data['password'] ], shell=False)
+    errlog.progLog(cam_data['hostname'])
+    hostname = cam_data['hostname']
+    errlog.progLog('hostname to use:', hostname, level=0)
+    proc = subprocess.Popen(['roslaunch', 'rtsp_ros_driver', 'rtsp_camera.launch', 'hostname:='+hostname, 'username:='+cam_data['username'], 'password:='+cam_data['password'], 'camera_name:='+cam_data['topic_name'], ], shell=False)
     return proc, proc.pid
 
 
@@ -69,5 +83,8 @@ def cameraCheck():
                 FROM cameras
                 ;'''
 
+def camFirstRun():
+    return '''UPDATE cameras SET pid = -1 WHERE pid != -1;'''
+
 def check():
-    print('check check. if you can see this, that is a good sign')
+    errlog.progLog('check check. if you can see this, that is a good sign', level=1)

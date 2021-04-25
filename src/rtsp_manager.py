@@ -8,6 +8,7 @@ import sys
 from multiprocessing import Process
 import db_interface as db
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient, BlobSasPermissions
+import errlog
 
 # sleep time in sec
 T = 60
@@ -35,12 +36,14 @@ def cameraProcess(sleep_time):
     while True:
         statement = rtsp.cameraCheck()
         camera_jobs = db.readDb(statement)
-        print(camera_jobs)
+        errlog.progLog(camera_jobs, level=0)
         stat, fails = db.checkRunning(camera_jobs)
         if not stat:
+            errlog.progLog('new camera processes to start', level=0)
             for f in fails:
                 if f['pid'] == -1:
                     proc, pid = rtsp.addCamera(f)
+                    errlog.progLog('pid response from add camera:', pid, level=0)
                     CAMERAS[f['topic_name']] = {
                         'id': f['id'],
                         'pid': pid,
@@ -55,20 +58,20 @@ def cameraProcess(sleep_time):
 # stop certian jobs
 def recordProcess(sleep_time):
     while True:
-        print('running the record process')
+        errlog.progLog('running the record process', level=0)
         start_statement = rtsp.startSelectStatement()
         stop_statement = rtsp.stopSelectStatement()
         # get jobs that need to be started
         start_jobs = db.readDb(start_statement)
-        print('jobs to start', start_jobs)
+        errlog.progLog('jobs to start', start_jobs, level=0)
         # get jobs that need to be stopped
         stop_jobs = db.readDb(stop_statement)
-        print('jobs to stop', stop_jobs)
+        errlog.progLog('jobs to stop', stop_jobs, level=0)
         # start jobs that need to start
         if type(start_jobs) != type(None):
             for sj in start_jobs:
                 proc, pid = rtsp.record(sj['camera_topics'])
-                print('started a job', pid)
+                errlog.progLog('started a job', pid, level=0)
                 RECORDINGS[pid] = {'id': sj['id'],
                                 'pid': pid,
                                 'proc': proc,
@@ -81,7 +84,7 @@ def recordProcess(sleep_time):
             for stop in stop_jobs:
                 # before = len(RECORDINGS)
                 try:
-                    os.kill(stop['pid'], 0)
+                    os.kill(stop['pid'], 2)
                     proc = RECORDINGS[stop['pid']]['proc']
                     rtsp.stopRecord(proc)
                     RECORDINGS.pop(stop['pid'])
@@ -90,13 +93,13 @@ def recordProcess(sleep_time):
                 db.insertPID(stop['id'], -1, 'recordings')
                 # assert (len(RECORDINGS) < before), 'A recording was not deleted from the dict RECORDINGS.'
         # Find all non active bags and push to blob
-        blobLoader()
+        # blobLoader()
 
         time.sleep(sleep_time)
 
 
 def blobLoader():
-    print('blob loader active')
+    errlog.progLog('blob loader active', level=0)
     # global_file_path = '~/catkin_ws/src/ros_security_recorder/src/'
     global_file_path = os.curdir
     # double check this is correct for where the bags go
@@ -108,31 +111,49 @@ def blobLoader():
         # Create a blob client using the local file name as the name for the blob
         # blob_client = blob_service_client.get_blob_client(container=container_name, blob=b)
         blob_client = blob_service_client.get_blob_client(blob=b)
-        print("\nUploading to Azure Storage as blob:\n\t" + b)
+        errlog.progLog("\nUploading to Azure Storage as blob:\n\t" + b, level=0)
 
         upload_file_path = os.path.join(global_file_path, b)
 
         # Upload the created file
-        with open(upload_file_path, "rb") as data:
-            blob_client.upload_blob(data)
+        try:
+            with open(upload_file_path, "rb") as data:
+                blob_client.upload_blob(data)
+            
+            errlog.progLog('upload complete', level=1)
 
-        if os.path.exists(upload_file_path):
-            os.remove(upload_file_path)
-        else:
-            print("The file does not exist")
+            if os.path.exists(upload_file_path):
+                os.remove(upload_file_path)
+            else:
+                errlog.progLog("file delete error", level=2)
+        except:
+            errlog.progLog('error uploading bags', level=2)
 
+    errlog.progLog('end blob loader', level=0)
+
+
+def blobSpinner(sleep_time):
+    while True:
+        blobLoader()
+        time.sleep(sleep_time)
 
 # keep everything running
-def main():
-    rtsp.check()
-    print('in main')
+def main(firstrun=True):
+    if firstrun:
+        db.resetCameraPids()
 
-    c = Process(target=cameraProcess, args=(3600,))
+    rtsp.check()
+    errlog.progLog('in main', level=0)
+
+    c = Process(target=cameraProcess, args=(600,))
     r = Process(target=recordProcess, args=(T,))
+    u = Process(target=blobSpinner, args=(120,))
     c.start()
     r.start()
+    u.start()
     c.join()
     r.join()
+    u.join()
 
 # do the main loop
 main()
