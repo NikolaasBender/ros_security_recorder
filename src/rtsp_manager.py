@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 import time
-import os
-import rtsp_recorder as rtsp
+import os, signal
 import rospy
 import sys
-from multiprocessing import Process
+from multiprocessing import Process, Pool
 import db_interface as db
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient, BlobSasPermissions
 import errlog
+import rtsp_recorder as rtsp
 
 # sleep time in sec
 T = 60
@@ -35,22 +35,22 @@ container_name = 'smartbases'
 def cameraProcess(sleep_time):
     while True:
         statement = rtsp.cameraCheck()
-        camera_jobs = db.readDb(statement)
+        camera_jobs = [db.readDb(statement)]
         errlog.progLog(camera_jobs, level=0)
-        stat, fails = db.checkRunning(camera_jobs)
-        if not stat:
-            errlog.progLog('new camera processes to start', level=0)
-            for f in fails:
-                if f['pid'] == -1:
-                    proc, pid = rtsp.addCamera(f)
-                    errlog.progLog('pid response from add camera:', pid, level=0)
-                    CAMERAS[f['topic_name']] = {
-                        'id': f['id'],
-                        'pid': pid,
-                        'proc': proc,
-                        'topic': f['topic_name']
-                    }
-                    db.insertPID(f['id'], pid, 'cameras')
+        # stat, fails = db.checkRunning(camera_jobs)
+        # errlog.progLog(fails, level=1)
+        errlog.progLog('new camera processes to start', level=0)
+        with Pool(5) as p:
+            p.map(rtsp.addCamera, *camera_jobs)
+                # proc, pid = rtsp.addCamera(f)
+                # errlog.progLog('pid response from add camera:', pid, level=0)
+                # CAMERAS[f['topic_name']] = {
+                #     'id': f['id'],
+                #     'pid': pid,
+                #     'proc': proc,
+                #     'topic': f['topic_name']
+                # }
+                # db.insertPID(f['id'], pid, 'cameras')
 
         time.sleep(sleep_time)
 
@@ -84,9 +84,10 @@ def recordProcess(sleep_time):
             for stop in stop_jobs:
                 # before = len(RECORDINGS)
                 try:
-                    os.kill(stop['pid'], 2)
+                    # os.kill(stop['pid'], 2)
+                    os.kill(stop['pid'], signal.SIGINT)
                     proc = RECORDINGS[stop['pid']]['proc']
-                    rtsp.stopRecord(proc)
+                    # rtsp.stopRecord(proc)
                     RECORDINGS.pop(stop['pid'])
                 except OSError:
                     stop['pid'] = -1               
@@ -125,9 +126,10 @@ def blobLoader():
             if os.path.exists(upload_file_path):
                 os.remove(upload_file_path)
             else:
-                errlog.progLog("file delete error", level=2)
-        except:
-            errlog.progLog('error uploading bags', level=2)
+                errlog.progLog("file delete error name: ", upload_file_path, level=2)
+        except err:
+            errlog.progLog('error uploading bag name: ', upload_file_path, err, level=2)
+
 
     errlog.progLog('end blob loader', level=0)
 
@@ -138,22 +140,22 @@ def blobSpinner(sleep_time):
         time.sleep(sleep_time)
 
 # keep everything running
-def main(firstrun=True):
-    if firstrun:
-        db.resetCameraPids()
-
-    rtsp.check()
+def main():
+    # rospy.init_node('rtsp_manager')
+    
     errlog.progLog('in main', level=0)
 
     c = Process(target=cameraProcess, args=(600,))
     r = Process(target=recordProcess, args=(T,))
-    u = Process(target=blobSpinner, args=(120,))
+    u = Process(target=blobSpinner, args=(3600,))
     c.start()
     r.start()
     u.start()
     c.join()
     r.join()
     u.join()
+    
+    rospy.spin()
 
 # do the main loop
 main()

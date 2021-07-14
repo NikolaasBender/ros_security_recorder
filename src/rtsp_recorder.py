@@ -12,6 +12,8 @@ import subprocess
 from datetime import datetime as dt
 import re
 import errlog
+import db_interface as db
+import rtsp_2_ros
 
 class bcolors:
     HEADER = '\033[95m'
@@ -28,13 +30,39 @@ SAVE_LOCATION = ''
 
 def record(topics):
     # os.system('rosbag record camera_')
-    topics = [t+'/image_raw' for t in topics]
-    errlog.progLog('topic string', topics, level=0)
+    # try:
+    #     topics = validateTopics(topics)
+    # except:
+    #     errlog.progLog('error validating topics', level=2)
+    topics = validateTopics(topics)
+    errlog.progLog('topic string ', topics, level=0)
     # bag_name = 'please_change_me.bag'
     # proc = subprocess.Popen(['rosbag', 'record', '-O', bag_name, *topics], shell=False)
     proc = subprocess.Popen(['rosbag', 'record', *topics], shell=False)
     return proc, proc.pid
 
+
+def validateTopics(topics):
+    # get the topics from the cameras table
+    # db_topics = db.readDb('select topic_name from cameras')
+    # dbt = [t['topic_name'] for t in db_topics]
+    # get the topics alive in ros
+    # ros_topics = rospy.get_published_topics()
+    # ros_topics = list(set([rt[0].split('/')[1] for rt in ros_topics if rt != '/rosout' or rt != '/rosout_agg']))
+    # errlog.progLog('db topics: ', dbt, ' ros topics: ', ros_topics, level=1)
+    # if dbt.sort() != ros_topics.sort():
+    #     errlog.progLog('error asserting that active ros topics are the same as in the db', level=2)
+        # raise 
+    # if set(topics).issubset(set(ros_topics)) == False:
+    #     errlog.progLog('error asserting that requested topics exist as active ros topics', level=2)
+        # return None
+    # if set(topics).issubset(set(dbt)) == False:
+    #     errlog.progLog('error asserting that requested topics exist in the database', level=2)
+        # return None
+    # everything checks out, return good topics
+    topics = [t+'/compressed' for t in topics]
+    return topics
+    
 
 def stopRecord(proc):
    proc.terminate()
@@ -48,11 +76,22 @@ def addCamera(cam_data):
     # <arg name="port" default="554" doc="port of the rtsp camera" />
     # <arg name="stream" default="defaultPrimary?mtu=1440&amp;streamType=m" doc="name of the video stream published by the rtsp camera" />
     # cli arg like this hoge:=my_value
-    errlog.progLog(cam_data['hostname'])
-    hostname = cam_data['hostname']
-    errlog.progLog('hostname to use:', hostname, level=0)
-    proc = subprocess.Popen(['roslaunch', 'rtsp_ros_driver', 'rtsp_camera.launch', 'hostname:='+hostname, 'username:='+cam_data['username'], 'password:='+cam_data['password'], 'camera_name:='+cam_data['topic_name'], ], shell=False)
-    return proc, proc.pid
+    # errlog.progLog('hostname to use:', cam_data['hostname'], level=0)
+    # proc = subprocess.Popen(['roslaunch', 'rtsp_ros_driver', 'rtsp_camera.launch', 'hostname:='+hostname, 'username:='+cam_data['username'], 'password:='+cam_data['password'], 'camera_name:='+cam_data['topic_name'], ], shell=False)
+    # errlog.progLog('newly started camera pid', proc.pid)
+    # return proc, proc.pid
+
+    urlTemp = "rtsp://administrator:smartbases@192.168.50.106:554/defaultPrimary?mtu=1440&streamType=m"
+    # resource=f"rtsp://{cam_data['username']}:{cam_data['password']}@{cam_data['hostname']}:{cam_data['port']}/{cam_data['stream']}"
+
+
+    resource=f"rtsp://{cam_data['username']}:{cam_data['password']}@{cam_data['hostname']}:{cam_data['port']}/defaultPrimary?mtu=1440&streamType=m"
+
+    if(urlTemp == resource):
+        errlog.progLog('oh my ;-) your hostname and password are valid for the test cam')
+
+    rtsp_2_ros.do_math(resource, cam_data['topic_name'], "i_hope_nobody_sees_this",  cam_data['topic_name'], '/camera_info')
+    
 
 
 def startSelectStatement():
