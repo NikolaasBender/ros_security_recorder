@@ -19,6 +19,8 @@ CAMERAS = {}
 # this has the recording processes stored
 RECORDINGS = {}
 
+AZURE_UPLOAD = True
+
 # connection string for our azure blob storage
 # ENV didn't work
 # az_connect = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
@@ -101,34 +103,49 @@ def recordProcess(sleep_time):
 
 def blobLoader():
     errlog.progLog('blob loader active', level=0)
-    # global_file_path = '~/catkin_ws/src/ros_security_recorder/src/'
-    global_file_path = os.curdir
+    # global_file_path = os.curdir()
     # double check this is correct for where the bags go
     # bags = os.listdir(global_file_path)
     bags = os.listdir()
     bags = [b for b in bags if '.bag.active' not in b and '.bag' in b]
+    
+    errlog.progLog("bags:", bags, level=0)
 
     for b in bags:
-        # Create a blob client using the local file name as the name for the blob
-        # blob_client = blob_service_client.get_blob_client(container=container_name, blob=b)
-        blob_client = blob_service_client.get_blob_client(blob=b)
-        errlog.progLog("\nUploading to Azure Storage as blob:\n\t" + b, level=0)
 
-        upload_file_path = os.path.join(global_file_path, b)
-
-        # Upload the created file
-        try:
-            with open(upload_file_path, "rb") as data:
-                blob_client.upload_blob(data)
-            
-            errlog.progLog('upload complete', level=1)
-
-            if os.path.exists(upload_file_path):
-                os.remove(upload_file_path)
+        if not AZURE_UPLOAD:
+            errlog.progLog("\nsaving bag to drive:\n\t" + b, level=0)
+            target_folder = "media/shack_nuc/smartbases"
+            target_file = b
+            errlog.progLog("target file: " + target_file, level=0)
+            if os.path.exists(str(target_file)):
+                shutil.move(target_file, target_folder)
             else:
-                errlog.progLog("file delete error name: ", upload_file_path, level=2)
-        except err:
-            errlog.progLog('error uploading bag name: ', upload_file_path, err, level=2)
+                errlog.progLog("\ncan not access drive:\n\t" + b, level=2)
+            errlog.progLog("\ndone saving bag to drive:\n\t" + b, level=0)
+
+
+        else:
+            # Create a blob client using the local file name as the name for the blob
+            # blob_client = blob_service_client.get_blob_client(container=container_name, blob=b)
+            blob_client = blob_service_client.get_blob_client(blob=b)
+            errlog.progLog("\nUploading to Azure Storage as blob:\n\t" + b, level=0)
+            global_file_path = '~/catkin_ws/src/ros_security_recorder/src/'
+            upload_file_path = os.path.join(global_file_path, b)
+
+            # Upload the created file
+            try:
+                with open(upload_file_path, "rb") as data:
+                    blob_client.upload_blob(data)
+                
+                errlog.progLog('upload complete', level=1)
+
+                if os.path.exists(upload_file_path):
+                    os.remove(upload_file_path)
+                else:
+                    errlog.progLog("file delete error name: ", upload_file_path, level=2)
+            except err:
+                errlog.progLog('error uploading bag name: ', upload_file_path, err, level=2)
 
 
     errlog.progLog('end blob loader', level=0)
@@ -147,7 +164,7 @@ def main():
 
     c = Process(target=cameraProcess, args=(600,))
     r = Process(target=recordProcess, args=(T,))
-    u = Process(target=blobSpinner, args=(3600,))
+    u = Process(target=blobSpinner, args=(T,))
     c.start()
     r.start()
     u.start()
