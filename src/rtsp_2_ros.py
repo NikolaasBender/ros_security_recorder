@@ -12,6 +12,7 @@ from threading import Thread
 from time import sleep
 import errlog
 
+# this reads the rtsp stream and converts it to ros messages
 def do_math(resource, camera_name, camera_frame, image_topic, camera_info_topic):
     sleep(60)
     # initialize ROS node
